@@ -7,9 +7,9 @@ import { ja } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RANGE_LABELS } from "@/lib/format";
-import { RANGE_KEYS, type RangeKey } from "@/lib/readings";
+import { isRangeKey, RANGE_KEYS, type RangeKey } from "@/lib/readings";
 
 type RangeToolbarProps = {
   range: RangeKey;
@@ -32,29 +32,30 @@ export function RangeToolbar({
 
   return (
     <div className="flex items-center gap-2">
-      <ToggleGroup
-        value={[range]}
-        onValueChange={(next) => {
-          const selected = next[0];
-          if (selected && RANGE_KEYS.includes(selected as RangeKey)) {
-            onRangeChange(selected as RangeKey);
+      <Tabs
+        value={range}
+        onValueChange={(next, eventDetails) => {
+          if (
+            eventDetails.reason === "initial" ||
+            eventDetails.reason === "disabled" ||
+            eventDetails.reason === "missing"
+          ) {
+            return;
+          }
+          if (isRangeKey(next)) {
+            onRangeChange(next);
           }
         }}
-        variant="default"
-        size="sm"
-        spacing={0}
-        className="flex-1 rounded-full bg-muted p-1"
+        className="min-w-0 flex-1 gap-0"
       >
-        {RANGE_KEYS.map((key) => (
-          <ToggleGroupItem
-            key={key}
-            value={key}
-            className="flex-1 rounded-full aria-pressed:bg-background aria-pressed:shadow-sm"
-          >
-            {RANGE_LABELS[key]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+        <TabsList className="h-10 w-full">
+          {RANGE_KEYS.map((key) => (
+            <TabsTrigger key={key} value={key}>
+              {RANGE_LABELS[key]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger
           render={
