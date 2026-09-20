@@ -34,22 +34,39 @@ async function tryInit(label, fn) {
 }
 
 async function detectAdc(i2cPort) {
-  const pcf = await tryInit("PCF8591", async () => {
-    const device = new PCF8591(i2cPort, 0x48);
-    await device.init();
-    await device.readADC(0);
-    return { kind: "pcf8591", device };
-  });
-  if (pcf) {
-    return pcf;
+  const candidates = [
+    {
+      label: "ADS7830",
+      init: async () => {
+        const device = new ADS7830(i2cPort, 0x4b);
+        await device.init();
+        await device.analogRead(0);
+        return { kind: "ads7830", device };
+      },
+    },
+    {
+      label: "PCF8591",
+      init: async () => {
+        const device = new PCF8591(i2cPort, 0x48);
+        await device.init();
+        await device.readADC(0);
+        return { kind: "pcf8591", device };
+      },
+    },
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const adcDevice = await candidate.init();
+      console.log(`${candidate.label}: OK`);
+      return adcDevice;
+    } catch {
+      // The other ADC chip is simply not on the bus.
+    }
   }
 
-  return tryInit("ADS7830", async () => {
-    const device = new ADS7830(i2cPort, 0x4b);
-    await device.init();
-    await device.analogRead(0);
-    return { kind: "ads7830", device };
-  });
+  console.warn("ADC（ADS7830 / PCF8591）が見つかりませんでした");
+  return null;
 }
 
 async function readLightPercent() {
