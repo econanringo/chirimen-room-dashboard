@@ -36,7 +36,7 @@ export function RoomDashboard() {
           <p className="text-sm text-muted-foreground">部屋のようす</p>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">ダッシュボード</h1>
         </div>
-        <p className="max-w-[9rem] text-right text-xs text-muted-foreground">
+        <p className="max-w-36 text-right text-xs text-muted-foreground">
           {live ? "ライブ受信" : connected ? "リレー待機" : "履歴表示"}
           {latest ? (
             <>
