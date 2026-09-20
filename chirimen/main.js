@@ -69,6 +69,11 @@ async function detectAdc(i2cPort) {
   return null;
 }
 
+function invertLightPercent(fraction) {
+  const percent = Math.round((1 - fraction) * 1000) / 10;
+  return Math.min(100, Math.max(0, percent));
+}
+
 async function readLightPercent() {
   if (!adc) {
     return null;
@@ -78,10 +83,10 @@ async function readLightPercent() {
     if (volts < 0) {
       return null;
     }
-    return Math.round((volts / 3.3) * 1000) / 10;
+    return invertLightPercent(volts / 3.3);
   }
   const raw = await adc.device.analogRead(0);
-  return Math.round((raw / 255) * 1000) / 10;
+  return invertLightPercent(raw / 255);
 }
 
 async function readOccupied() {

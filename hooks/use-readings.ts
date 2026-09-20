@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { RangeKey, ReadingsResponse } from "@/lib/readings";
+import { resolveQueryEnd, type RangeKey, type ReadingsResponse } from "@/lib/readings";
 
 export function useReadings(range: RangeKey, end: Date) {
   const [data, setData] = useState<ReadingsResponse | null>(null);
@@ -12,7 +12,7 @@ export function useReadings(range: RangeKey, end: Date) {
   const refresh = useCallback(async () => {
     const params = new URLSearchParams({
       range,
-      end: end.toISOString(),
+      end: resolveQueryEnd(end).toISOString(),
     });
     const response = await fetch(`/api/readings?${params.toString()}`, {
       cache: "no-store",

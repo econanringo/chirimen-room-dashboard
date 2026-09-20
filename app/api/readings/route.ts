@@ -39,13 +39,20 @@ export async function GET(request: NextRequest) {
   const range: RangeKey = isRangeKey(rangeParam) ? rangeParam : "week";
   const end = parseEnd(request.nextUrl.searchParams.get("end"));
   const { start } = windowForRange(range, end);
+  const hasLive = await prisma.reading.findFirst({
+    where: { source: "live" },
+    select: { id: true },
+  });
+  const source = hasLive ? "live" : undefined;
 
   const [latest, readings] = await Promise.all([
     prisma.reading.findFirst({
+      where: source ? { source } : undefined,
       orderBy: { recordedAt: "desc" },
     }),
     prisma.reading.findMany({
       where: {
+        ...(source ? { source } : {}),
         recordedAt: {
           gte: start,
           lte: end,
@@ -144,6 +151,7 @@ export async function POST(request: NextRequest) {
       pressure: asNumber(payload.pressure),
       light: asNumber(payload.light),
       occupied: asBoolean(payload.occupied),
+      source: "live",
     },
   });
 

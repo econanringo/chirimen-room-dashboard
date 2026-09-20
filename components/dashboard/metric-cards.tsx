@@ -72,7 +72,7 @@ function HeroCard({
     <Card
       size="sm"
       className={cn(
-        "cursor-pointer py-4 shadow-none ring-foreground/8 transition-shadow",
+        "h-full cursor-pointer py-4 shadow-none ring-foreground/8 transition-shadow",
         selected === metric && "ring-2 ring-foreground/20",
       )}
     >
@@ -120,6 +120,7 @@ function RowCard({
       onClick={() => onSelect(metric)}
       className={cn(
         "flex w-full items-center justify-between rounded-3xl px-4 py-3 text-left transition-colors hover:bg-muted/60",
+        "md:flex-col md:items-start md:justify-center md:gap-2 md:py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-3",
         selected === metric && "bg-muted",
       )}
     >
@@ -132,7 +133,7 @@ function RowCard({
           {value == null ? "不明" : value === 1 ? "在室" : "不在"}
         </Badge>
       ) : (
-        <span className="font-heading text-lg font-medium">
+        <span className="font-heading text-lg font-medium md:text-2xl lg:text-lg">
           {value == null ? "--" : formatMetricNumber(metric, value, false)}
           <span className="ml-0.5 text-sm font-normal text-muted-foreground">
             {metricUnit(metric, false)}
@@ -145,8 +146,8 @@ function RowCard({
 
 export function MetricCards({ latest, selected, onSelect }: MetricCardsProps) {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3">
+    <div className="flex flex-col gap-3 lg:sticky lg:top-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
         <HeroCard
           metric="temperature"
           latest={latest}
@@ -160,7 +161,10 @@ export function MetricCards({ latest, selected, onSelect }: MetricCardsProps) {
           onSelect={onSelect}
         />
       </div>
-      <Card size="sm" className="gap-0 py-1 shadow-none ring-foreground/8">
+      <Card
+        size="sm"
+        className="gap-0 py-1 shadow-none ring-foreground/8 md:grid md:grid-cols-3 md:py-1 lg:flex lg:flex-col"
+      >
         <RowCard metric="pressure" latest={latest} selected={selected} onSelect={onSelect} />
         <RowCard metric="light" latest={latest} selected={selected} onSelect={onSelect} />
         <RowCard metric="occupied" latest={latest} selected={selected} onSelect={onSelect} />

@@ -15,8 +15,10 @@ model Reading {
   pressure    Float?
   light       Float?
   occupied    Boolean?
+  source      String   @default("live")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([recordedAt])
+  @@index([source, recordedAt])
 }

@@ -85,6 +85,15 @@ export function windowForRange(key: RangeKey, end: Date): { start: Date; end: Da
   };
 }
 
+export function resolveQueryEnd(selectedEnd: Date, now = new Date()): Date {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  if (selectedEnd.getTime() >= startOfToday.getTime()) {
+    return now;
+  }
+  return selectedEnd;
+}
+
 export function occupiedAsRate(key: RangeKey): boolean {
   return key === "week" || key === "month";
 }
@@ -120,6 +129,48 @@ function statsFromValues(values: number[]): MetricStats | null {
 
 function bucketStart(timestamp: number, bucketMs: number, origin: number): number {
   return origin + Math.floor((timestamp - origin) / bucketMs) * bucketMs;
+}
+
+function metricValueFromSample(sample: SensorSample, metric: MetricKey): number | null {
+  if (metric === "occupied") {
+    if (sample.occupied == null) {
+      return null;
+    }
+    return sample.occupied ? 1 : 0;
+  }
+  const value = sample[metric];
+  return typeof value === "number" ? value : null;
+}
+
+export function applyLiveSampleToSeries(
+  points: ChartPoint[],
+  stats: MetricStats | null,
+  live: SensorSample | null,
+  metric: MetricKey,
+  range: RangeKey,
+  start: Date,
+  occupiedAsRate: boolean,
+): { points: ChartPoint[]; stats: MetricStats | null } {
+  if (!live) {
+    return { points, stats };
+  }
+  const raw = metricValueFromSample(live, metric);
+  if (raw == null) {
+    return { points, stats };
+  }
+  const value = metric === "occupied" && occupiedAsRate ? raw * 100 : raw;
+  const t = bucketStart(
+    new Date(live.recordedAt).getTime(),
+    bucketMsForRange(range),
+    start.getTime(),
+  );
+  const nextPoints = points.filter((point) => point.t !== t);
+  nextPoints.push({ t, value });
+  nextPoints.sort((a, b) => a.t - b.t);
+  return {
+    points: nextPoints,
+    stats: statsFromValues(nextPoints.map((point) => point.value)),
+  };
 }
 
 export function aggregateReadings(

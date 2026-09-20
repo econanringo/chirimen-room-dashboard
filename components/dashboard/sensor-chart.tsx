@@ -106,7 +106,7 @@ export function SensorChart({
     <Card className="shadow-none ring-foreground/8">
       <CardContent className="flex flex-col gap-4">
         <h2 className="font-heading text-lg font-medium">{METRIC_LABELS[metric]}</h2>
-        <div className="flex min-h-56 gap-3">
+        <div className="flex min-h-56 gap-3 md:min-h-80 lg:min-h-112">
           <div className="flex w-16 shrink-0 flex-col justify-between py-2 text-xs">
             <div>
               <p className="text-muted-foreground">最高</p>
@@ -130,7 +130,7 @@ export function SensorChart({
               </p>
             </div>
           </div>
-          <ChartContainer config={chartConfig} className="aspect-auto! h-56 w-full flex-1">
+          <ChartContainer config={chartConfig} className="aspect-auto! h-56 w-full flex-1 md:h-80 lg:h-112">
             {chartType === "bar" ? (
               <BarChart
                 data={data}

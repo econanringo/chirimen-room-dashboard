@@ -25,7 +25,9 @@ function isOccupiedAt(date: Date) {
 }
 
 async function main() {
-  await prisma.reading.deleteMany();
+  await prisma.reading.deleteMany({
+    where: { source: "seed" },
+  });
 
   const end = new Date();
   end.setSeconds(0, 0);
@@ -53,6 +55,7 @@ async function main() {
       pressure: Number(pressure.toFixed(2)),
       light: Number(light.toFixed(1)),
       occupied,
+      source: "seed",
     });
   }
 
