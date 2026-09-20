@@ -33,6 +33,10 @@ async function tryInit(label, fn) {
   }
 }
 
+function isI2cTimeout(error) {
+  return /timed?\s*out|ETIMEDOUT/i.test(String(error?.message ?? error ?? ""));
+}
+
 async function detectAdc(i2cPort) {
   const candidates = [
     {
@@ -60,8 +64,14 @@ async function detectAdc(i2cPort) {
       const adcDevice = await candidate.init();
       console.log(`${candidate.label}: OK`);
       return adcDevice;
-    } catch {
-      // The other ADC chip is simply not on the bus.
+    } catch (error) {
+      if (isI2cTimeout(error)) {
+        console.warn(
+          `${candidate.label} がタイムアウトしました。I2C バスが停止している可能性があります`,
+          error.message ?? error,
+        );
+        return null;
+      }
     }
   }
 
@@ -212,13 +222,13 @@ async function main() {
     return device;
   });
 
+  adc = await detectAdc(i2cPort);
+
   bmp180 = await tryInit("BMP180", async () => {
     const device = new BMP180(i2cPort, 0x77);
     await device.init();
     return device;
   });
-
-  adc = await detectAdc(i2cPort);
 
   pirPort = await tryInit("HW416A", async () => {
     const gpioAccess = await requestGPIOAccess();
