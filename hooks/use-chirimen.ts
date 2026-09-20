@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   connectChirimenRelay,
@@ -29,12 +29,14 @@ export function useChirimenLive(onPersisted: () => void, previous: SensorSample 
   const [live, setLive] = useState<SensorSample | null>(null);
   const [connected, setConnected] = useState(false);
   const previousRef = useRef(previous);
+  const sendRef = useRef<((message: unknown) => void) | null>(null);
   previousRef.current = previous;
 
   useEffect(() => {
     const relay = connectChirimenRelay({
       onStatus: setConnected,
       onOpen: (send) => {
+        sendRef.current = send;
         send("GET SENSOR DATA");
       },
       onMessage: (payload) => {
@@ -49,9 +51,14 @@ export function useChirimenLive(onPersisted: () => void, previous: SensorSample 
     });
 
     return () => {
+      sendRef.current = null;
       relay.close();
     };
   }, [onPersisted]);
 
-  return { live, connected };
+  const request = useCallback(() => {
+    sendRef.current?.("GET SENSOR DATA");
+  }, []);
+
+  return { live, connected, request };
 }

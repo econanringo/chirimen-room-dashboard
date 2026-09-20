@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { LiveClock } from "@/components/dashboard/live-clock";
 import { MetricCards } from "@/components/dashboard/metric-cards";
 import { RangeToolbar } from "@/components/dashboard/range-toolbar";
 import { RefreshProgress } from "@/components/dashboard/refresh-progress";
@@ -9,7 +10,6 @@ import { SensorChart } from "@/components/dashboard/sensor-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChirimenLive } from "@/hooks/use-chirimen";
 import { useReadings } from "@/hooks/use-readings";
-import { formatDateTimeSeconds } from "@/lib/format";
 import {
   applyLiveSampleToSeries,
   resolveQueryEnd,
@@ -27,7 +27,11 @@ export function RoomDashboard() {
   const onPersisted = useCallback(() => {
     void refresh();
   }, [refresh]);
-  const { live } = useChirimenLive(onPersisted, data?.latest ?? null);
+  const { live, request } = useChirimenLive(onPersisted, data?.latest ?? null);
+  const onCycle = useCallback(() => {
+    request();
+    void refresh().catch(() => undefined);
+  }, [refresh, request]);
 
   const latest = live ?? data?.latest ?? null;
   const start = useMemo(
@@ -60,16 +64,9 @@ export function RoomDashboard() {
               ダッシュボード
             </h1>
           </div>
-          {latest ? (
-            <time
-              dateTime={latest.recordedAt}
-              className="text-right text-sm tabular-nums text-muted-foreground"
-            >
-              {formatDateTimeSeconds(new Date(latest.recordedAt))}
-            </time>
-          ) : null}
+          <LiveClock />
         </div>
-        <RefreshProgress />
+        <RefreshProgress onCycle={onCycle} />
       </header>
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start lg:gap-6">

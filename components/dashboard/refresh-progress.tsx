@@ -1,25 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import {
   REFRESH_INTERVAL_MS,
   elapsedRefreshMs,
+  refreshCycleIndex,
   remainingRefreshSeconds,
 } from "@/lib/refresh";
 
-export function RefreshProgress() {
-  const [elapsedMs, setElapsedMs] = useState(0);
+type RefreshProgressProps = {
+  onCycle: () => void;
+};
 
-  useEffect(() => {
-    const startedAt = Date.now();
+export function RefreshProgress({ onCycle }: RefreshProgressProps) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const onCycleRef = useRef(onCycle);
+  onCycleRef.current = onCycle;
+
+  useLayoutEffect(() => {
+    let lastCycle = refreshCycleIndex();
     let frame = 0;
     const tick = () => {
-      setElapsedMs(elapsedRefreshMs(startedAt));
+      const now = new Date();
+      const cycle = refreshCycleIndex(now);
+      setElapsedMs(elapsedRefreshMs(now));
+      if (cycle !== lastCycle) {
+        lastCycle = cycle;
+        onCycleRef.current();
+      }
       frame = window.requestAnimationFrame(tick);
     };
-    frame = window.requestAnimationFrame(tick);
+    tick();
     return () => window.cancelAnimationFrame(frame);
   }, []);
 

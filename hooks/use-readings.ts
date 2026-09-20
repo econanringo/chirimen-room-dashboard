@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { REFRESH_INTERVAL_MS } from "@/lib/refresh";
 import { resolveQueryEnd, type RangeKey, type ReadingsResponse } from "@/lib/readings";
 
 export function useReadings(range: RangeKey, end: Date) {
@@ -41,13 +40,8 @@ export function useReadings(range: RangeKey, end: Date) {
         }
       });
 
-    const timer = window.setInterval(() => {
-      void refresh().catch(() => undefined);
-    }, REFRESH_INTERVAL_MS);
-
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
     };
   }, [refresh]);
 
