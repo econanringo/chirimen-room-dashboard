@@ -104,7 +104,9 @@ SHT30 なら `44`、BMP180 なら `77`、ADC なら `48` または `4b` が見�
 
 ## 動作
 
-- 30 秒ごとに `{ temperature, humidity, pressure, light, occupied }` を送信します。無いセンサーは `null` です
+- 10 秒ごとに `{ temperature, humidity, pressure, light, occupied }` を送信します。無いセンサーは `null` です
 - ダッシュボードからの `GET SENSOR DATA` にも応答します
-- 人感の変化でもすぐ送ります
+- 人感の変化では GPIO だけ更新し、I2C は触りません（バスが固まって `ETIMEDOUT` になるのを防ぐため）
 - Next.js を LAN で常時起動している場合は、`INGEST_URL=http://<PCのIP>:3000/api/readings node main.js` とすると、ダッシュボードを開いていなくても履歴が貯まります
+
+I2C が `ETIMEDOUT` のまま戻らないときは、`main.js` を一度止めて起動し直してください。それでもすぐ固まる場合は `/boot/firmware/config.txt`（または `/boot/config.txt`）に `dtparam=i2c_arm_baudrate=10000` を足して再起動すると、SHT30 のクロックストレッチでバスが落ちにくくなります。

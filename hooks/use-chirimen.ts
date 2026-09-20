@@ -48,12 +48,7 @@ export function useChirimenLive(onPersisted: () => void, previous: SensorSample 
       },
     });
 
-    const requestTimer = window.setInterval(() => {
-      relay.send("GET SENSOR DATA");
-    }, 30_000);
-
     return () => {
-      window.clearInterval(requestTimer);
       relay.close();
     };
   }, [onPersisted]);

@@ -14,13 +14,30 @@ const RELAY_TOKEN = process.env.RELAY_TOKEN ?? "chirimenSocket";
 const CHANNEL = process.env.RELAY_CHANNEL ?? "chirimenRoom";
 const INGEST_URL = process.env.INGEST_URL ?? "";
 const PIR_PIN = Number(process.env.PIR_PIN ?? 17);
-const INTERVAL_MS = Number(process.env.INTERVAL_MS ?? 30_000);
+const INTERVAL_MS = Number(process.env.INTERVAL_MS ?? 10_000);
+const I2C_RETRY_GAP_MS = 80;
+const I2C_SENSOR_GAP_MS = 20;
+const SAMPLE_CACHE_MS = 1_500;
 
+let i2cPort;
 let sht30;
 let bmp180;
 let adc;
 let pirPort;
 let relaySocket;
+let lastSample = null;
+let lastReadAt = 0;
+let i2cChain = Promise.resolve();
+let recovering = false;
+
+function withI2cLock(fn) {
+  const run = i2cChain.then(fn, fn);
+  i2cChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 async function tryInit(label, fn) {
   try {
@@ -37,7 +54,11 @@ function isI2cTimeout(error) {
   return /timed?\s*out|ETIMEDOUT/i.test(String(error?.message ?? error ?? ""));
 }
 
-async function detectAdc(i2cPort) {
+function occupiedFromValue(value) {
+  return value === 1 || value === "high" || value === true;
+}
+
+async function detectAdc() {
   const candidates = [
     {
       label: "ADS7830",
@@ -79,6 +100,34 @@ async function detectAdc(i2cPort) {
   return null;
 }
 
+async function initI2cDevices() {
+  sht30 = await tryInit("SHT30", async () => {
+    const device = new SHT30(i2cPort, 0x44);
+    await device.init();
+    return device;
+  });
+  adc = await detectAdc();
+  bmp180 = await tryInit("BMP180", async () => {
+    const device = new BMP180(i2cPort, 0x77);
+    await device.init();
+    return device;
+  });
+}
+
+async function recoverI2c(reason) {
+  if (recovering) {
+    return;
+  }
+  recovering = true;
+  console.warn(`I2C を再初期化します (${reason})`);
+  try {
+    await sleep(200);
+    await initI2cDevices();
+  } finally {
+    recovering = false;
+  }
+}
+
 function invertLightPercent(fraction) {
   const percent = Math.round((1 - fraction) * 1000) / 10;
   return Math.min(100, Math.max(0, percent));
@@ -104,7 +153,26 @@ async function readOccupied() {
     return null;
   }
   const value = await pirPort.read();
-  return value === 1 || value === "high" || value === true;
+  return occupiedFromValue(value);
+}
+
+async function tryRead(label, reader) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return { value: await reader(), timedOut: false };
+    } catch (error) {
+      const timedOut = isI2cTimeout(error);
+      console.warn(
+        `${label} read failed${timedOut && attempt < 2 ? " (retry)" : ""}`,
+        error.message ?? error,
+      );
+      if (!timedOut || attempt === 2) {
+        return { value: null, timedOut };
+      }
+      await sleep(I2C_RETRY_GAP_MS);
+    }
+  }
+  return { value: null, timedOut: true };
 }
 
 async function readSensors() {
@@ -115,30 +183,28 @@ async function readSensors() {
     light: null,
     occupied: null,
   };
+  let timedOut = false;
 
   if (sht30) {
-    try {
-      const sht = await sht30.readData();
-      sample.temperature = sht.temperature;
-      sample.humidity = sht.humidity;
-    } catch (error) {
-      console.warn("SHT30 read failed", error.message ?? error);
+    const sht = await tryRead("SHT30", () => sht30.readData());
+    timedOut ||= sht.timedOut;
+    if (sht.value) {
+      sample.temperature = sht.value.temperature;
+      sample.humidity = sht.value.humidity;
     }
+    await sleep(I2C_SENSOR_GAP_MS);
   }
 
   if (bmp180) {
-    try {
-      sample.pressure = await bmp180.readPressure();
-    } catch (error) {
-      console.warn("BMP180 read failed", error.message ?? error);
-    }
+    const pressure = await tryRead("BMP180", () => bmp180.readPressure());
+    timedOut ||= pressure.timedOut;
+    sample.pressure = pressure.value;
+    await sleep(I2C_SENSOR_GAP_MS);
   }
 
-  try {
-    sample.light = await readLightPercent();
-  } catch (error) {
-    console.warn("light read failed", error.message ?? error);
-  }
+  const light = await tryRead("light", readLightPercent);
+  timedOut ||= light.timedOut;
+  sample.light = light.value;
 
   try {
     sample.occupied = await readOccupied();
@@ -146,7 +212,22 @@ async function readSensors() {
     console.warn("PIR read failed", error.message ?? error);
   }
 
-  return sample;
+  return { sample, timedOut };
+}
+
+async function readSensorsExclusive() {
+  return withI2cLock(async () => {
+    if (lastSample && Date.now() - lastReadAt < SAMPLE_CACHE_MS) {
+      return { sample: lastSample, fromCache: true };
+    }
+    const { sample, timedOut } = await readSensors();
+    lastSample = sample;
+    lastReadAt = Date.now();
+    if (timedOut) {
+      await recoverI2c("timeout");
+    }
+    return { sample, fromCache: false };
+  });
 }
 
 function sendRelay(message) {
@@ -174,6 +255,19 @@ async function publish(sample) {
   }
 }
 
+async function publishOccupied(occupied) {
+  lastSample = lastSample
+    ? { ...lastSample, occupied }
+    : {
+        temperature: null,
+        humidity: null,
+        pressure: null,
+        light: null,
+        occupied,
+      };
+  await publish(lastSample);
+}
+
 async function connectRelay() {
   const url = `${RELAY_URL.replace(/\/$/, "")}/${RELAY_TOKEN}/${CHANNEL}`;
   const socket = new WebSocket(url);
@@ -195,9 +289,15 @@ async function connectRelay() {
     } catch {
       // keep raw string
     }
-    if (body === "GET SENSOR DATA") {
-      await publish(await readSensors());
+    if (body !== "GET SENSOR DATA") {
+      return;
     }
+    const { sample, fromCache } = await readSensorsExclusive();
+    if (fromCache) {
+      sendRelay(sample);
+      return;
+    }
+    await publish(sample);
   });
 
   socket.on("close", () => {
@@ -214,28 +314,24 @@ async function connectRelay() {
 
 async function main() {
   const i2cAccess = await requestI2CAccess();
-  const i2cPort = i2cAccess.ports.get(1);
-
-  sht30 = await tryInit("SHT30", async () => {
-    const device = new SHT30(i2cPort, 0x44);
-    await device.init();
-    return device;
-  });
-
-  adc = await detectAdc(i2cPort);
-
-  bmp180 = await tryInit("BMP180", async () => {
-    const device = new BMP180(i2cPort, 0x77);
-    await device.init();
-    return device;
-  });
+  i2cPort = i2cAccess.ports.get(1);
+  await initI2cDevices();
 
   pirPort = await tryInit("HW416A", async () => {
     const gpioAccess = await requestGPIOAccess();
     const port = gpioAccess.ports.get(PIR_PIN);
-    await port.export("in", { edge: "both" });
-    port.onchange = async () => {
-      await publish(await readSensors());
+    await port.export("in", { edge: "both", debounce: 300 });
+    port.onchange = (event) => {
+      const value = event?.value;
+      if (value === 0 || value === 1) {
+        void publishOccupied(occupiedFromValue(value));
+        return;
+      }
+      void readOccupied().then((occupied) => {
+        if (occupied != null) {
+          void publishOccupied(occupied);
+        }
+      });
     };
     return port;
   });
@@ -246,7 +342,10 @@ async function main() {
     if (relaySocket?.readyState === WebSocket.OPEN) {
       relaySocket.send("");
     }
-    await publish(await readSensors());
+    const { sample, fromCache } = await readSensorsExclusive();
+    if (!fromCache) {
+      await publish(sample);
+    }
     await sleep(INTERVAL_MS);
   }
 }

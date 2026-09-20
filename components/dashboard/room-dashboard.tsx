@@ -4,11 +4,12 @@ import { useCallback, useMemo, useState } from "react";
 
 import { MetricCards } from "@/components/dashboard/metric-cards";
 import { RangeToolbar } from "@/components/dashboard/range-toolbar";
+import { RefreshProgress } from "@/components/dashboard/refresh-progress";
 import { SensorChart } from "@/components/dashboard/sensor-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChirimenLive } from "@/hooks/use-chirimen";
 import { useReadings } from "@/hooks/use-readings";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTimeSeconds } from "@/lib/format";
 import {
   applyLiveSampleToSeries,
   resolveQueryEnd,
@@ -26,7 +27,7 @@ export function RoomDashboard() {
   const onPersisted = useCallback(() => {
     void refresh();
   }, [refresh]);
-  const { live, connected } = useChirimenLive(onPersisted, data?.latest ?? null);
+  const { live } = useChirimenLive(onPersisted, data?.latest ?? null);
 
   const latest = live ?? data?.latest ?? null;
   const start = useMemo(
@@ -51,22 +52,24 @@ export function RoomDashboard() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6 md:gap-5 md:py-8 lg:px-8 lg:py-10">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">部屋のようす</p>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-            ダッシュボード
-          </h1>
-        </div>
-        <p className="text-right text-xs text-muted-foreground sm:text-sm">
-          {live ? "ライブ受信" : connected ? "リレー待機" : "履歴表示"}
+      <header className="flex flex-col gap-3">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">部屋のようす</p>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+              ダッシュボード
+            </h1>
+          </div>
           {latest ? (
-            <>
-              <br />
-              {formatDateTime(new Date(latest.recordedAt))}
-            </>
+            <time
+              dateTime={latest.recordedAt}
+              className="text-right text-sm tabular-nums text-muted-foreground"
+            >
+              {formatDateTimeSeconds(new Date(latest.recordedAt))}
+            </time>
           ) : null}
-        </p>
+        </div>
+        <RefreshProgress />
       </header>
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
