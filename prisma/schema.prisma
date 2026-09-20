@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Reading {
+  id          Int      @id @default(autoincrement())
+  recordedAt  DateTime
+  temperature Float
+  humidity    Float
+  pressure    Float?
+  light       Float?
+  occupied    Boolean?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([recordedAt])
+}

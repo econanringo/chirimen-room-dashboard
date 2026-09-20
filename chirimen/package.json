@@ -1,0 +1,16 @@
+{
+  "name": "room-dashboard-chirimen",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "@chirimen/bmp180": "^2.0.0",
+    "@chirimen/pcf8591": "^2.0.0",
+    "@chirimen/sht30": "^2.0.0",
+    "node-web-gpio": "^2.0.0",
+    "node-web-i2c": "^1.1.51",
+    "ws": "^8.18.3"
+  }
+}
